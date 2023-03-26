@@ -133,6 +133,10 @@ wait_vblank2:
 	tya
 	pha
 
+	; transfer sprite OAM data using DMA
+	lda #>oam
+	sta SPRITE_DMA
+
 	lda nmi_ready
 	bne :+ ; nmi_ready == 0 not ready to update PPU
 		jmp ppu_update_end
@@ -146,16 +150,9 @@ wait_vblank2:
 		jmp ppu_update_end
 cont_render:
 
-	; transfer sprite OAM data using DMA
-	ldx #0
-	stx PPU_SPRRAM_ADDRESS
-	lda #>oam
-	sta SPRITE_DMA
-
 	; transfer current palette to PPU
-	lda #%10001000 ; set horizontal nametable increment
-	sta PPU_CONTROL_1 
 	lda PPU_STATUS
+	ldx #0
 	lda #$3F ; set PPU address to $3F00
 	sta PPU_VRAM_ADDRESS2
 	stx PPU_VRAM_ADDRESS2
@@ -338,7 +335,7 @@ default_palette:
 .byte $0F,$19,$29,$39 ; bg1 green
 .byte $0F,$11,$21,$31 ; bg2 blue
 .byte $0F,$00,$10,$30 ; bg3 greyscale
-.byte $0F,$18,$28,$38 ; sp0 yellow
+.byte $0F,$28,$21,$11 ; sp0 player
 .byte $0F,$14,$24,$34 ; sp1 purple
 .byte $0F,$1B,$2B,$3B ; sp2 teal
 .byte $0F,$12,$22,$32 ; sp3 marine

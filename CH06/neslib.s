@@ -143,7 +143,7 @@ loop:
 
 .segment "ZEROPAGE"
 
-text_address:	.res 1 ; set to the address of the text to write
+text_address:	.res 2 ; set to the address of the text to write
 
 .segment "CODE"
 .proc write_text
