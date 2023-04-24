@@ -64,8 +64,8 @@ ATTRIBUTE_TABLE_1_ADDRESS	= $27C0
 
 .segment "ZEROPAGE"
 
-nmi_ready:		.res 1 ; set to 1 to push a PPU frame update, 
-					   ;        2 to turn rendering off next NMI
+nmi_ready:		.res 1	; set to 1 to push a PPU frame update, 
+						;        2 to turn rendering off next NMI
 ppu_ctl0:		.res 1 ; PPU Control Register 2 Value
 ppu_ctl1:		.res 1 ; PPU Control Register 2 Value
 
@@ -314,5 +314,43 @@ ch2:	.res 1 ; object 2 height
 	rts
 .endproc
 
+;*****************************************************************
+;  0-99 Decimal to digit conversion
+;  A = number to convert
+; Outputs:
+; X = decimal tens
+; A = decimal ones
+;*****************************************************************
+.segment "CODE"
+
+.proc dec99_to_bytes
+    ldx    #0
+    cmp    #50                   ; A = 0-99
+    bcc    try20
+    sbc    #50
+    ldx    #5
+    bne    try20                ; always branch
+
+div20:
+    inx
+    inx
+    sbc    #20
+
+try20:
+    cmp    #20
+    bcs    div20
+
+try10:
+    cmp    #10
+    bcc    @finished
+    sbc    #10
+    inx
+
+@finished:
+	; X = decimal tens
+	; A = decimal ones
+
+	rts
+.endproc
 
 

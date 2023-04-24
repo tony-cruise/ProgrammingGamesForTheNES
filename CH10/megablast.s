@@ -45,6 +45,9 @@ animate: .res 1
 enemydata: .res 10
 enemycooldown: .res 1
 temp: .res 10
+score: .res 3
+update: .res 1
+highscore: .res 3
 
 ;*****************************************************************
 ; Sprite OAM Data area - copied to VRAM in NMI routine
@@ -125,7 +128,7 @@ wait_vblank2:
 	; - enable the NMI for graphical updates and jump to our main program
 	lda #%10001000
 	sta PPU_CONTROL_1
-jmp main
+	jmp main
 .endproc
 
 ;*****************************************************************
@@ -161,6 +164,23 @@ jmp main
 	inx
 	cpx #32
 	bcc @loop
+
+	lda #%00000001 ; has the score updated?
+	bit update
+	beq @skipscore
+		jsr display_score ; display score
+		lda #%11111110 ; reset score update flag
+		and update
+		sta update
+@skipscore:
+	lda #%00000010 ; has the high score updated?
+	bit update
+	beq @skiphighscore
+		jsr display_highscore ; display high score
+		lda #%11111101 ; reset high score update flag
+		and update
+		sta update
+@skiphighscore:
 
 	; write current scroll and control settings
 	lda #0
@@ -198,6 +218,8 @@ irq:
  .segment "CODE"
  .proc main
  	; main application - rendering is currently off
+	lda #1 ; set initial high score to 1000
+	sta highscore+1
 
  	; initialize palette table
  	ldx #0
@@ -242,6 +264,14 @@ titleloop:
 	lda #1
 	sta level
 	jsr setup_level
+
+	lda #0 ; reset the player's score
+	sta score
+	sta score+1
+	sta score+2
+	lda #%00000001 ; set flag so the current score will be displayed
+	ora update
+	sta update
 
 	; draw the game screen
 	jsr display_game_screen
@@ -430,6 +460,9 @@ mainloop:
 	sta oam+12,x
 	lda #0 ; clear the enemies in use flag
 	sta enemydata,y
+
+	lda #1 ; subtract 10 from the score
+	jsr subtract_score
 	jmp @skip
 
 @nohitbottom:
@@ -464,6 +497,9 @@ mainloop:
 	lda #0 ; clear enemy's data flag
 	sta enemydata,y
 
+	lda #2 ; add 20 points to the score
+	jsr add_score
+
 @skip:
 	iny ; goto to next enemy
 	cpy #10
@@ -487,6 +523,190 @@ mainloop:
 	bne @loop
 	lda #20 ; set initial enemy cool down
 	sta enemycooldown
+	rts
+.endproc
+
+;*****************************************************************
+; add_score: Add to the players score
+; Parameters:
+; a = value to add to the score
+;*****************************************************************
+.segment "CODE"
+.proc add_score
+	clc
+	adc score ; add the value in a to the 1st byte of the score
+	sta score
+	cmp #99
+	bcc @skip
+
+	sec ; 1st byte has exceeded 99, handle overflow
+	sbc #100
+	sta score
+	inc score+1
+	lda score+1
+	cmp #99
+	bcc @skip
+
+	sec ; 2nd byte has exceeded 99, handle overflow
+	sbc #100
+	sta score+1
+	inc score+2
+	lda score+2
+	cmp #99
+	bcc @skip
+	sec ; if 3rd byte has exceeded 99, adjust and discard overflow
+	sbc #100
+	sta score+2
+	
+@skip:
+	lda #%000000001 ; set flag to write score to the screen
+	ora update
+	sta update
+
+	lda highscore+2
+	cmp score+2
+	bcc @highscore
+	bne @nothighscore
+
+	lda highscore+1
+	cmp score+1
+	bcc @highscore
+	bne @nothighscore
+
+	lda highscore
+	cmp score
+	bcs @nothighscore
+
+@highscore:
+	lda score
+	sta highscore
+	lda score+1
+	sta highscore+1
+	lda score+2
+	sta highscore+2
+
+	lda #%00000010 ; set flag to write high score to the screen
+	ora update
+	sta update
+
+@nothighscore:
+	rts
+.endproc
+
+;*****************************************************************
+; subtract_score: Subtract from the players score
+; Parameters:
+; a = value to subtract from the score
+;*****************************************************************
+.segment "CODE"
+.proc subtract_score
+	sta temp ; save our a value
+	sec
+	lda score
+	sbc temp ; subtract the value in a from the 1st byte of the score
+	sta score
+	bcs @skip
+
+	clc
+	adc #100 ; current value in a is negative, add to 100 to ensure we are 99 or less
+	sta score
+	dec score+1 ; decrement our 2nd score byte
+	bcs @skip
+
+	clc ; add 100 to ensure byte 2 is 99 or less
+	lda score+1
+	adc #100
+	sta score+1
+	dec score+2 ; decrement our 3rd score byte
+	bcs @skip
+
+	lda #0 ; ensure the score can't be less than zero
+	sta score+2
+	sta score+1
+	sta score
+
+@skip:
+	lda #%00000001 ; set flag to write score to the screen
+	ora update
+	sta update
+	rts
+.endproc
+
+;*****************************************************************
+; display_score: Write the score to the screen
+;*****************************************************************
+.segment "CODE"
+
+.proc display_score
+	vram_set_address (NAME_TABLE_0_ADDRESS + 27 * 32 + 6)
+
+	lda score+2 ; transform each decimal digit of the score
+	jsr dec99_to_bytes
+	stx temp
+	sta temp+1
+
+	lda score+1
+	jsr dec99_to_bytes
+	stx temp+2
+	sta temp+3
+
+	lda score
+	jsr dec99_to_bytes
+	stx temp+4
+	sta temp+5
+
+	ldx #0 ; write the six characters to the screen
+@loop:
+	lda temp,x
+	clc
+	adc #48
+	sta PPU_VRAM_IO
+	inx
+	cpx #6
+	bne @loop
+	lda #48 ; write trailing zero
+	sta PPU_VRAM_IO
+
+	vram_clear_address
+	rts
+.endproc
+
+;*****************************************************************
+; display_highscore: Write the high score to the screen
+;*****************************************************************
+.segment "CODE"
+
+.proc display_highscore
+	vram_set_address (NAME_TABLE_0_ADDRESS + 1 * 32 + 13)
+
+	lda highscore+2 ; transform each decimal digit of the high score
+	jsr dec99_to_bytes
+	stx temp
+	sta temp+1
+
+	lda highscore+1
+	jsr dec99_to_bytes
+	stx temp+2
+	sta temp+3
+
+	lda highscore
+	jsr dec99_to_bytes
+	stx temp+4
+	sta temp+5
+
+	ldx #0 ; write the six characters to the screen
+@loop:
+	lda temp,x
+	clc
+	adc #48
+	sta PPU_VRAM_IO
+	inx
+	cpx #6
+	bne @loop
+	lda #48 ; write trailing zero
+	sta PPU_VRAM_IO
+
+	vram_clear_address
 	rts
 .endproc
 
