@@ -147,44 +147,33 @@ wait_vblank2:
 		inc time+1
 	:
 
+	bit PPU_STATUS
 	; transfer sprite OAM data using DMA
 	lda #>oam
 	sta SPRITE_DMA
 
-	lda nmi_ready
-	bne :+ ; nmi_ready == 0 not ready to update PPU
-		jmp ppu_update_end
-	:
-	cmp #2 ; nmi_ready == 2 turns rendering off
-	bne cont_render
-		lda #%00000000
-		sta PPU_CONTROL_2
-		ldx #0
-		stx nmi_ready
-		jmp ppu_update_end
-cont_render:
-
 	; transfer current palette to PPU
-	lda PPU_STATUS
-	ldx #0
-	lda #$3F ; set PPU address to $3F00
-	sta PPU_VRAM_ADDRESS2
-	stx PPU_VRAM_ADDRESS2
+	vram_set_address $3F00
 	ldx #0 ; transfer the 32 bytes to VRAM
-loop:
+@loop:
 	lda palette, x
 	sta PPU_VRAM_IO
 	inx
 	cpx #32
-	bcc loop
+	bcc @loop
 
-	; enable rendering
-	lda #%00011110
+	; write current scroll and control settings
+	lda #0
+	sta PPU_VRAM_ADDRESS1
+	sta PPU_VRAM_ADDRESS1
+	lda ppu_ctl0
+	sta PPU_CONTROL_1
+	lda ppu_ctl1
 	sta PPU_CONTROL_2
+
 	; flag PPU update complete
 	ldx #0
 	stx nmi_ready
-ppu_update_end:
 
 	; restore registers and return
 	pla
@@ -222,6 +211,14 @@ paletteloop:
  	; draw the title screen
 	jsr display_title_screen
 
+	; set our game settings
+	lda #VBLANK_NMI|BG_0000|OBJ_1000
+   	sta ppu_ctl0
+   	lda #BG_ON|OBJ_ON
+   	sta ppu_ctl1
+
+	jsr ppu_update
+
 	; wait for a gamepad button to be pressed
 titleloop:
 	jsr gamepad_poll
@@ -251,10 +248,10 @@ titleloop:
 
 	; display the player's ship
 	; set the Y position (byte 0) of all four parts of the player ship
-	lda #192
+	lda #196
 	sta oam
 	sta oam+4
-	lda #200
+	lda #204
 	sta oam+8
 	sta oam+12
 	; set the index number (byte 1) of the sprite pattern
@@ -609,7 +606,7 @@ game_screen_mountain:
 .byte 001,002,003,004,001,002,003,004,001,002,003,004,001,002,003,004
 .byte 001,002,003,004,001,002,003,004,001,002,003,004,001,002,003,004
 game_screen_scoreline:
-.byte "SCORE 000000"
+.byte "SCORE 0000000"
 
 .segment "ZEROPAGE"
 
@@ -622,7 +619,7 @@ paddr: .res 2 ; 16-bit address pointer
 	jsr clear_nametable ; Clear the 1st name table
 
 	; output mountain line
-	vram_set_address (NAME_TABLE_0_ADDRESS + 16 * 32)
+	vram_set_address (NAME_TABLE_0_ADDRESS + 22 * 32)
 	assign_16i paddr, game_screen_mountain
 	ldy #0
 loop:
@@ -633,7 +630,7 @@ loop:
 	bne loop
 
 	; draw a base line
-	vram_set_address (NAME_TABLE_0_ADDRESS + 20 * 32)
+	vram_set_address (NAME_TABLE_0_ADDRESS + 26 * 32)
 	ldy #0
 	lda #9 ; tile number to repeat
 loop2:
@@ -649,7 +646,7 @@ loop3:
 	lda (paddr),y
 	sta PPU_VRAM_IO
 	iny
-	cpy #12
+	cpy #13
 	bne loop3
 
 	jsr ppu_update ; Wait until the screen has been drawn

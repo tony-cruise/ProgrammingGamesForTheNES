@@ -13,6 +13,31 @@ PPU_VRAM_ADDRESS2 = $2006 ; PPU VRAM Address Register 2 (Write)
 PPU_VRAM_IO = $2007 ; VRAM I/O Register (Read/Write)
 SPRITE_DMA = $4014 ; Sprite DMA Register
 
+; Define PPU control register masks
+NT_2000 = $00 ; nametable location
+NT_2400 = $01
+NT_2800 = $02
+NT_2C00 = $03
+
+VRAM_DOWN = $04 ; increment VRAM pointer by row
+
+OBJ_0000 = $00 
+OBJ_1000 = $08
+OBJ_8X16 = $20
+
+BG_0000 = $00 ; 
+BG_1000 = $10
+
+VBLANK_NMI = $80 ; enable NMI
+
+BG_OFF = $00 ; turn background off
+BG_CLIP = $08 ; clip background
+BG_ON = $0A ; turn background on
+
+OBJ_OFF = $00 ; turn objects off
+OBJ_CLIP = $10 ; clip objects
+OBJ_ON = $14 ; turn objects on
+
 ; Define APU Registers
 APU_DM_CONTROL = $4010 ; APU Delta Modulation Control Register (Write)
 APU_CLOCK = $4015 ; APU Sound/Vertical Clock Signal Register (Read/Write)
@@ -41,19 +66,36 @@ ATTRIBUTE_TABLE_1_ADDRESS	= $27C0
 
 nmi_ready:		.res 1 ; set to 1 to push a PPU frame update, 
 					   ;        2 to turn rendering off next NMI
+ppu_ctl0:		.res 1 ; PPU Control Register 2 Value
+ppu_ctl1:		.res 1 ; PPU Control Register 2 Value
 
 .include "macros.s"
+
+;*****************************************************************
+; wait_frame: waits until the next NMI occurs
+;*****************************************************************
+.segment "CODE"
+.proc wait_frame
+	inc nmi_ready
+@loop:
+	lda nmi_ready
+	bne @loop
+	rts
+.endproc
 
 ;*****************************************************************
 ; ppu_update: waits until next NMI, turns rendering on (if not already), uploads OAM, palette, and nametable update to PPU
 ;*****************************************************************
 .segment "CODE"
 .proc ppu_update
-	lda #1
-	sta nmi_ready
-	loop:
-		lda nmi_ready
-		bne loop
+	lda ppu_ctl0
+	ora #VBLANK_NMI
+	sta ppu_ctl0
+	sta PPU_CONTROL_1
+	lda ppu_ctl1
+	ora #OBJ_ON|BG_ON
+	sta ppu_ctl1
+	jsr wait_frame
 	rts
 .endproc
 
@@ -62,11 +104,15 @@ nmi_ready:		.res 1 ; set to 1 to push a PPU frame update,
 ;*****************************************************************
 .segment "CODE"
 .proc ppu_off
-	lda #2
-	sta nmi_ready
-	loop:
-		lda nmi_ready
-		bne loop
+	jsr wait_frame
+	lda ppu_ctl0
+	and #%01111111
+	sta ppu_ctl0
+	sta PPU_CONTROL_1
+	lda ppu_ctl1
+	and #%11100001
+	sta ppu_ctl1
+	sta PPU_CONTROL_2
 	rts
 .endproc
 

@@ -233,7 +233,7 @@ paletteloop:
  	; draw the title screen
 	jsr display_title_screen
 
-	; set out game settings
+	; set our game settings
 	lda #VBLANK_NMI|BG_0000|OBJ_1000
    	sta ppu_ctl0
    	lda #BG_ON|OBJ_ON
