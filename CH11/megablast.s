@@ -48,6 +48,8 @@ temp: .res 10
 score: .res 3
 update: .res 1
 highscore: .res 3
+lives: .res 1
+player_dead: .res 1
 
 ;*****************************************************************
 ; Sprite OAM Data area - copied to VRAM in NMI routine
@@ -136,6 +138,10 @@ wait_vblank2:
 ;*****************************************************************
 
 .segment "CODE"
+
+gameovertext:
+.byte " G A M E  O V E R",0
+
 .proc nmi
 	; save registers
 	pha
@@ -181,6 +187,24 @@ wait_vblank2:
 		and update
 		sta update
 @skiphighscore:
+	lda #%00000100 ; display the players lives
+	bit update
+	beq @skiplives
+		jsr display_lives
+		lda #%11111011
+		and update
+		sta update
+@skiplives:
+	lda #%00001000 ; does the game over message need to be displayed?
+	bit update
+	beq @skipgameover
+		vram_set_address (NAME_TABLE_0_ADDRESS + 14 * 32 + 7)
+		assign_16i text_address, gameovertext 
+		jsr write_text
+		lda #%11110111 ; reset game over message update flag
+		and update
+		sta update
+@skipgameover:
 
 	; write current scroll and control settings
 	lda #0
@@ -230,6 +254,9 @@ paletteloop:
 	cpx #32
 	bcc paletteloop
 
+resetgame:
+	jsr clear_sprites
+
  	; draw the title screen
 	jsr display_title_screen
 
@@ -269,40 +296,20 @@ titleloop:
 	sta score
 	sta score+1
 	sta score+2
+	lda #%00000001 ; set flag so the current score will be displayed
+	ora update
+	sta update
+
+	lda #5 ; set the players starting lives
+	sta lives
+	lda #0 ; reset our player_dead flag
+	sta player_dead 
 
 	; draw the game screen
 	jsr display_game_screen
 
 	; display the player's ship
-	; set the Y position (byte 0) of all four parts of the player ship
-	lda #196
-	sta oam
-	sta oam+4
-	lda #204
-	sta oam+8
-	sta oam+12
-	; set the index number (byte 1) of the sprite pattern
-	ldx #0
-	stx oam+1
-	inx
-	stx oam+5
-	inx
-	stx oam+9
-	inx
-	stx oam+13
-	; set the sprite attributes (byte 2)
-	lda #%00000000
-	sta oam+2
-	sta oam+6
-	sta oam+10
-	sta oam+14
-	; set the X position (byte 3)  of all four parts of the player ship
-	lda #120
-	sta oam+3
-	sta oam+11
-	lda #128
-	sta oam+7
-	sta oam+15
+	jsr display_player
 
 	jsr ppu_update
 
@@ -314,12 +321,84 @@ mainloop:
 	; time has changed update the lasttime value
 	sta lasttime
 
+	lda lives
+	bne @notgameover
+	lda player_dead
+	cmp #240 ; we have waited long enough, jump back to the title screen 
+	beq resetgame
+	cmp #20
+	bne @notgameoversetup
+	lda #%00001000 ; signal to display Game Over message
+	ora update
+	sta update
+@notgameoversetup:
+	inc player_dead
+	jmp mainloop
+@notgameover:
+
 	jsr player_actions
 	jsr move_player_bullet
 	jsr spawn_enemies
 	jsr move_enemies
 
  	jmp mainloop
+.endproc
+
+.segment "CODE"
+.proc display_lives
+	ldx lives
+	beq @skip ; no lives to display
+	vram_set_address (NAME_TABLE_0_ADDRESS + 27 * 32 + 14)
+	and #%00000111 ; limit to a max of 8
+@loop:
+	lda #5
+	sta PPU_VRAM_IO
+	lda #6
+	sta PPU_VRAM_IO
+	dex
+	bne @loop
+
+@skip:
+	lda #8 ; blank out the remainder of the row
+	sec
+	sbc lives
+	bcc @skip2
+	tax
+	lda #0
+@loop2:
+	sta PPU_VRAM_IO
+	sta PPU_VRAM_IO
+	dex
+	bne @loop2
+@skip2:
+
+	ldx lives
+	beq @skip3 ; no lives to display
+	vram_set_address (NAME_TABLE_0_ADDRESS + 28 * 32 + 14)
+	and #%00000111 ; limit to a max of 8
+@loop3:
+	lda #7
+	sta PPU_VRAM_IO
+	lda #8
+	sta PPU_VRAM_IO
+	dex
+	bne @loop3	
+
+@skip3:
+	lda #8 ; blank out the remainder of the row
+	sec
+	sbc lives
+	bcc @skip4
+	tax
+	lda #0
+@loop4:
+	sta PPU_VRAM_IO
+	sta PPU_VRAM_IO
+	dex
+	bne @loop4
+@skip4:
+
+	rts
 .endproc
 
 .segment "CODE"
@@ -431,7 +510,9 @@ mainloop:
 	lda #0
 @loop:
 	lda enemydata,y
-	beq @skip
+	bne :+
+		jmp @skip
+	:
 
 	; enemy is on screen
 	; calculate first sprite oam position
@@ -470,6 +551,46 @@ mainloop:
 	sta oam+8,x
 	sta oam+12,x
 
+	lda player_dead
+	cmp #0 ; check the player is not currently dead
+	bne @notlevelwithplayer
+	lda oam,x ; get enemy Y
+	clc
+	adc #14 ; add on the enemies height
+	cmp #204 ; is the enemy level with the player
+	bcc @notlevelwithplayer
+
+	lda oam+3 ; get the players X position	
+	clc
+	adc #12 ; add on the width of the player
+	cmp oam+3,x ; is the enemies X larger than the player plus it's width?
+	bcc @notlevelwithplayer
+
+	lda oam+3,x ; get the enemy X position
+	clc
+	adc #14 ; add on it's width
+	cmp oam+3 ; is the enemies X plus it's width smaller than the player's X position
+	bcc @notlevelwithplayer
+
+	dec lives ; decrease our lives counter
+	lda #%00000100 ; set flag so the current lives will be displayed
+	ora update
+	sta update
+
+	lda #1 ; mark the player as currently dead
+	sta player_dead
+
+	lda #$ff
+	sta oam,x ; erase enemy
+	sta oam+4,x
+	sta oam+8,x
+	sta oam+12,x
+	lda #0 ; clear enemy's data flag
+	sta enemydata,y
+	jmp @skip
+
+@notlevelwithplayer:
+
 	lda oam+16
 	cmp #$FF ; is player bullet on screen
 	beq @skip
@@ -498,9 +619,11 @@ mainloop:
 	jsr add_score
 
 @skip:
-	iny ; goto to next enemy
+	iny ; goto next enemy
 	cpy #10
-	bne @loop
+	beq :+
+		jmp @loop
+	:
 
 	rts
 .endproc
@@ -520,6 +643,14 @@ mainloop:
 	bne @loop
 	lda #20 ; set initial enemy cool down
 	sta enemycooldown
+	
+	lda #$ff ; hide all enemy sprites
+	ldx #0
+@loop2:
+	sta oam+20,x
+	inx
+	cpx #160
+	bne @loop2
 	rts
 .endproc
 
@@ -712,7 +843,102 @@ mainloop:
 ;*****************************************************************
 .segment "CODE"
 
+.proc set_player_shape
+	stx oam+1
+	inx
+	stx oam+5
+	inx
+	stx oam+9
+	inx
+	stx oam+13
+	rts
+.endproc
+
+.proc display_player
+	; set the Y position (byte 0) of all four parts of the player ship
+	lda #196
+	sta oam
+	sta oam+4
+	lda #204
+	sta oam+8
+	sta oam+12
+	; set the index number (byte 1) of the sprite pattern
+	ldx #0
+	stx oam+1
+	inx
+	stx oam+5
+	inx
+	stx oam+9
+	inx
+	stx oam+13
+	; set the sprite attributes (byte 2)
+	lda #%00000000
+	sta oam+2
+	sta oam+6
+	sta oam+10
+	sta oam+14
+	; set the X position (byte 3)  of all four parts of the player ship
+	lda #120
+	sta oam+3
+	sta oam+11
+	lda #128
+	sta oam+7
+	sta oam+15
+	rts
+.endproc
+
 .proc player_actions
+	lda player_dead
+	beq @continue
+	cmp #1 ; player flagged as dead, set initial shape
+	bne @notstep1
+	ldx #20 ; set 1st explosion pattern
+	jsr set_player_shape
+	lda #$00000001 ; select 2nd palette
+	sta oam+2
+	sta oam+6
+	sta oam+10
+	sta oam+14
+	jmp @nextstep
+
+@notstep1:
+	cmp #5 ; ready to change to next explosion shape
+	bne @notstep2
+	ldx #24 ; set 2nd explosion pattern
+	jsr set_player_shape
+	jmp @nextstep
+
+@notstep2:
+	cmp #10 ; ready to change to next explosion shape
+	bne @notstep3
+	ldx #28 ; set 3rd explosion pattern
+	jsr set_player_shape
+	jmp @nextstep
+
+@notstep3:
+	cmp #15 ; ready to change to next explosion shape
+	bne @notstep4
+	ldx #32 ; set 3rd explosion pattern
+	jsr set_player_shape
+	jmp @nextstep
+
+@notstep4:
+	cmp #20 ; explosion finished, reset player
+	bne @nextstep
+	lda lives
+	cmp #0 ; check for game over
+	bne @notgameover
+	rts ; game over exit
+@notgameover:
+	jsr setup_level ; reset all enemies objects
+	jsr display_player ; display the player at the starting position
+	lda #0 ; clear the player dead flag
+	sta player_dead
+	rts
+@nextstep:
+	inc player_dead
+	rts
+@continue:
 	jsr gamepad_poll
 	lda gamepad
 	and #PAD_L
@@ -900,6 +1126,8 @@ loop3:
 	cpy #13
 	bne loop3
 
+	jsr display_lives
+
 	jsr ppu_update ; Wait until the screen has been drawn
 	rts
 .endproc
@@ -915,6 +1143,6 @@ default_palette:
 .byte $0F,$11,$21,$31 ; bg2 blue
 .byte $0F,$00,$10,$30 ; bg3 greyscale
 .byte $0F,$28,$21,$11 ; sp0 player
-.byte $0F,$14,$24,$34 ; sp1 purple
+.byte $0F,$26,$28,$17 ; sp1 explosion
 .byte $0F,$1B,$2B,$3B ; sp2 teal
 .byte $0F,$12,$22,$32 ; sp3 marine
