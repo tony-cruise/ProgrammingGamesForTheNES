@@ -6,8 +6,8 @@
 ;*****************************************************************
 
 ; Define PPU Registers
-PPU_CONTROL_1 = $2000 ; PPU Control Register 1 (Write)
-PPU_CONTROL_2 = $2001 ; PPU Control Register 2 (Write)
+PPU_CONTROL = $2000 ; PPU Control Register 1 (Write)
+PPU_MASK = $2001 ; PPU Control Register 2 (Write)
 PPU_STATUS = $2002; PPU Status Register (Read)
 PPU_SPRRAM_ADDRESS = $2003 ; PPU SPR-RAM Address Register (Write)
 PPU_SPRRAM_IO = $2004 ; PPU SPR-RAM I/O Register (Write)
@@ -126,8 +126,8 @@ palette: .res 32 ; current palette buffer
 .proc reset
 	sei			; mask interrupts
 	lda #0
-	sta PPU_CONTROL_1	; disable NMI
-	sta PPU_CONTROL_2	; disable rendering
+	sta PPU_CONTROL	; disable NMI
+	sta PPU_MASK	; disable rendering
 	sta APU_DM_CONTROL	; disable DMC IRQ
 	lda #40
 	sta JOYPAD2		; disable APU frame IRQ
@@ -176,7 +176,7 @@ wait_vblank2:
 	; NES is initialized and ready to begin
 	; - enable the NMI for graphical updates and jump to our main program
 	lda #%10001000
-	sta PPU_CONTROL_1
+	sta PPU_CONTROL
 	jmp main
 .endproc
 
@@ -200,7 +200,7 @@ wait_vblank2:
 	cmp #2 ; nmi_ready == 2 turns rendering off
 	bne cont_render
 		lda #%00000000
-		sta PPU_CONTROL_2
+		sta PPU_MASK
 		ldx #0
 		stx nmi_ready
 		jmp ppu_update_end
@@ -214,7 +214,7 @@ cont_render:
 
 	; transfer current palette to PPU
 	lda #%10001000 ; set horizontal nametable increment
-	sta PPU_CONTROL_1 
+	sta PPU_CONTROL 
 	lda PPU_STATUS
 	lda #$3F ; set PPU address to $3F00
 	sta PPU_VRAM_ADDRESS2
@@ -229,7 +229,7 @@ loop:
 
 	; enable rendering
 	lda #%00011110
-	sta PPU_CONTROL_2
+	sta PPU_MASK
 	; flag PPU update complete
 	ldx #0
 	stx nmi_ready
