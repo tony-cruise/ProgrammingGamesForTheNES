@@ -3,8 +3,8 @@
 ;*****************************************************************
 
 ; Define PPU Registers
-PPU_CONTROL_1 = $2000 ; PPU Control Register 1 (Write)
-PPU_CONTROL_2 = $2001 ; PPU Control Register 2 (Write)
+PPU_CONTROL = $2000 ; PPU Control Register 1 (Write)
+PPU_MASK = $2001 ; PPU Control Register 2 (Write)
 PPU_STATUS = $2002; PPU Status Register (Read)
 PPU_SPRRAM_ADDRESS = $2003 ; PPU SPR-RAM Address Register (Write)
 PPU_SPRRAM_IO = $2004 ; PPU SPR-RAM I/O Register (Write)
@@ -91,7 +91,7 @@ ppu_ctl1:		.res 1 ; PPU Control Register 2 Value
 	lda ppu_ctl0
 	ora #VBLANK_NMI
 	sta ppu_ctl0
-	sta PPU_CONTROL_1
+	sta PPU_CONTROL
 	lda ppu_ctl1
 	ora #OBJ_ON|BG_ON
 	sta ppu_ctl1
@@ -108,11 +108,11 @@ ppu_ctl1:		.res 1 ; PPU Control Register 2 Value
 	lda ppu_ctl0
 	and #%01111111
 	sta ppu_ctl0
-	sta PPU_CONTROL_1
+	sta PPU_CONTROL
 	lda ppu_ctl1
 	and #%11100001
 	sta ppu_ctl1
-	sta PPU_CONTROL_2
+	sta PPU_MASK
 	rts
 .endproc
 

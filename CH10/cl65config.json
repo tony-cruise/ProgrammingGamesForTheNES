@@ -1,0 +1,5 @@
+{
+    "executable": "C:\\cc65\\bin\\ca65.exe",
+    "input": "megablast.s",
+    "params": "--verbose --target nes -o megablast.nes"
+}

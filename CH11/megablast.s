@@ -79,8 +79,8 @@ palette: .res 32 ; current palette buffer
 .proc reset
 	sei			; mask interrupts
 	lda #0
-	sta PPU_CONTROL_1	; disable NMI
-	sta PPU_CONTROL_2	; disable rendering
+	sta PPU_CONTROL	; disable NMI
+	sta PPU_MASK	; disable rendering
 	sta APU_DM_CONTROL	; disable DMC IRQ
 	lda #40
 	sta JOYPAD2		; disable APU frame IRQ
@@ -129,7 +129,7 @@ wait_vblank2:
 	; NES is initialized and ready to begin
 	; - enable the NMI for graphical updates and jump to our main program
 	lda #%10001000
-	sta PPU_CONTROL_1
+	sta PPU_CONTROL
 	jmp main
 .endproc
 
@@ -211,9 +211,9 @@ gameovertext:
 	sta PPU_VRAM_ADDRESS1
 	sta PPU_VRAM_ADDRESS1
 	lda ppu_ctl0
-	sta PPU_CONTROL_1
+	sta PPU_CONTROL
 	lda ppu_ctl1
-	sta PPU_CONTROL_2
+	sta PPU_MASK
 
 	; flag PPU update complete
 	ldx #0

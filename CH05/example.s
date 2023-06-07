@@ -129,7 +129,7 @@ palette: .res 32 ; current palette buffer
 	sta PPU_CONTROL	; disable NMI
 	sta PPU_MASK	; disable rendering
 	sta APU_DM_CONTROL	; disable DMC IRQ
-	lda #40
+	lda #$40
 	sta JOYPAD2		; disable APU frame IRQ
 
 	cld			; disable decimal mode
