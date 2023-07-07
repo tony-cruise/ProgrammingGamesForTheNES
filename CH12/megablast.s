@@ -346,9 +346,9 @@ mainloop:
 
 .segment "CODE"
 .proc display_lives
+	vram_set_address (NAME_TABLE_0_ADDRESS + 27 * 32 + 14)
 	ldx lives
 	beq @skip ; no lives to display
-	vram_set_address (NAME_TABLE_0_ADDRESS + 27 * 32 + 14)
 	and #%00000111 ; limit to a max of 8
 @loop:
 	lda #5
@@ -372,9 +372,9 @@ mainloop:
 	bne @loop2
 @skip2:
 
+	vram_set_address (NAME_TABLE_0_ADDRESS + 28 * 32 + 14)
 	ldx lives
 	beq @skip3 ; no lives to display
-	vram_set_address (NAME_TABLE_0_ADDRESS + 28 * 32 + 14)
 	and #%00000111 ; limit to a max of 8
 @loop3:
 	lda #7
