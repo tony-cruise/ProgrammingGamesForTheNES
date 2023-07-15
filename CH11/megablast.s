@@ -324,6 +324,8 @@ mainloop:
 	lda lives
 	bne @notgameover
 	lda player_dead
+	cmp #1
+	beq @notgameover
 	cmp #240 ; we have waited long enough, jump back to the title screen 
 	beq resetgame
 	cmp #20
@@ -539,6 +541,14 @@ mainloop:
 	lda #0 ; clear the enemies in use flag
 	sta enemydata,y
 
+	; check score is not already zero
+	clc
+	lda score
+	adc score+1
+	adc score+2
+	bne :+
+		jmp @skip
+	:
 	lda #1 ; subtract 10 from the score
 	jsr subtract_score
 	jmp @skip

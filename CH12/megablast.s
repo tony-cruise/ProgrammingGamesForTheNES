@@ -324,6 +324,8 @@ mainloop:
 	lda lives
 	bne @notgameover
 	lda player_dead
+	cmp #1
+	beq @notgameover
 	cmp #240 ; we have waited long enough, jump back to the title screen 
 	beq resetgame
 	cmp #20
@@ -680,7 +682,10 @@ mainloop:
 	lda oam,x ; get enemy Y
 	clc
 	adc enemydata+5,y ; add change in Y from table
-	cmp #196
+	sta oam,x ; save the new Y position
+	clc
+	adc enemydata+8,y ; add on the enemy's height
+	cmp #204
 	bcc @nohitbottom
 	; has reached the ground
 	lda #255
@@ -704,7 +709,18 @@ mainloop:
 	jmp @skip
 
 @nohitbottom:
-	sta oam,x ; save the new Y position
+	
+
+	lda enemydata+3,y
+	cmp #1 ; does the enemy only have one pattern
+	beq :+
+	lda oam,x ; update the other sprite Y positions
+	sta oam+4,x
+	clc
+	adc #8
+	sta oam+8,x
+	sta oam+12,x
+:
 
 	lda player_dead
 	cmp #0 ; check the player is not currently dead
@@ -712,16 +728,6 @@ mainloop:
 	lda oam,x ; get enemy Y
 	clc
 	adc enemydata+8,y ; add on the enemies height
-	lda enemydata+3,y
-	cmp #1 ; does the enemy only have one pattern
-	beq :+
-	lda oam,x
-	sta oam+4,x
-	clc
-	adc #8
-	sta oam+8,x
-	sta oam+12,x
-:
 	cmp #$c4 ; is the enemy level with the player
 	bcc @notlevelwithplayer
 
