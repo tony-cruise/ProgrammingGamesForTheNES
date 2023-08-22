@@ -431,7 +431,9 @@ mainloop:
 	lda #0
 @loop:
 	lda enemydata,y
-	beq @skip
+	beq :+
+		jmp @skip
+	:
 
 	; enemy is on screen
 	; calculate first sprite oam position
@@ -508,7 +510,9 @@ mainloop:
 @skip:
 	iny ; goto to next enemy
 	cpy #10
-	bne @loop
+	beq :+
+		jmp @loop
+	:
 
 	rts
 .endproc
