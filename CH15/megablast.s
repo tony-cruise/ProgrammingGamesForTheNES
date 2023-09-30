@@ -68,7 +68,7 @@ oam: .res 256	; sprite OAM data
 .include "neslib.s"
 
 ;*****************************************************************
-; Include Sound Engine and Sound Effects Data
+; Include Sound Engine, Sound Effects and Music Data
 ;*****************************************************************
 
 .segment "CODE"
@@ -96,6 +96,10 @@ FAMISTUDIO_DPCM_OFF           = $e000
 .include "famistudio_ca65.s"
 
 .include "megablast-sfx.s"
+.include "megablast-music.s"
+
+.segment "DPCM"
+.incbin "megablast-music.dmc"
 
 .segment "ZEROPAGE"
 
@@ -120,6 +124,7 @@ enemydata: .res 100 ; enemy tracking data
 	lda #0
 	sta PPU_CONTROL	; disable NMI
 	sta PPU_MASK	; disable rendering
+	sta APU_CLOCK	; disbale APU sound
 	sta APU_DM_CONTROL	; disable DMC IRQ
 	lda #40
 	sta JOYPAD2		; disable APU frame IRQ
@@ -338,8 +343,8 @@ irq:
 	sta highscore+1
 
    lda #1 ; NTSC 
-   ldx #0 
-   ldy #0 
+   ldx #.lobyte(music_data_untitled)
+   ldy #.hibyte(music_data_untitled) 
    jsr famistudio_init
 
    ldx #.lobyte(sounds) ; set address of sound effects
@@ -368,6 +373,9 @@ resetgame:
    	sta ppu_ctl1
 
 	jsr ppu_update
+
+	lda #0 ; Play 1st song
+	jsr play_music
 
 	; wait for a gamepad button to be pressed
 titleloop:
@@ -416,6 +424,9 @@ titleloop:
 	sta update
 
 	jsr ppu_update
+
+	lda #1 ; Play 2nd song
+	jsr play_music
 
 mainloop:
 	lda time
@@ -511,6 +522,28 @@ mainloop:
    rts
 .endproc
 
+;*********************************************************
+; Play a music track
+; a = number of the music track to play
+;*********************************************************/
+.segment "CODE"
+
+.proc play_music
+	sta temp+9 ; save music track number
+	tya ; save current register values
+	pha
+	txa
+	pha
+
+	lda temp+9 ; get music track to play
+	jsr famistudio_music_play
+
+	pla ; restore register values
+	tax
+	pla
+	tay
+	rts
+.endproc
 
 .segment "CODE"
 .proc display_lives
