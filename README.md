@@ -1,3 +1,3 @@
 # Programming Games For The NES
 ## By Tony Cruise
-Support files for the book "Programming Games for the NES"
+Support files for the book "Classic Game Programming on the NES"
