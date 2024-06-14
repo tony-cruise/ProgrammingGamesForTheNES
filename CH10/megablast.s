@@ -431,7 +431,7 @@ mainloop:
 	lda #0
 @loop:
 	lda enemydata,y
-	beq :+
+	bne :+
 		jmp @skip
 	:
 
