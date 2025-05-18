@@ -1232,7 +1232,7 @@ starlocations:	.res 10*2 ; two bytes per star
 	clc
 	adc score ; add the value in a to the 1st byte of the score
 	sta score
-	cmp #99
+	cmp #100
 	bcc @skip
 
 	sec ; 1st byte has exceeded 99, handle overflow
@@ -1240,7 +1240,7 @@ starlocations:	.res 10*2 ; two bytes per star
 	sta score
 	inc score+1
 	lda score+1
-	cmp #99
+	cmp #100
 	bcc @skip
 
 	sec ; 2nd byte has exceeded 99, handle overflow
@@ -1248,7 +1248,7 @@ starlocations:	.res 10*2 ; two bytes per star
 	sta score+1
 	inc score+2
 	lda score+2
-	cmp #99
+	cmp #100
 	bcc @skip
 	sec ; if 3rd byte has exceeded 99, adjust and discard overflow
 	sbc #100
