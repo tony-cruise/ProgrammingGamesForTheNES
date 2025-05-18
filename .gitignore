@@ -1,0 +1,5 @@
+*.deb
+*.dbg
+*.o
+CH10/megablast.labels.txt
+CH10/megablast.map.txt
